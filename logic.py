@@ -34,7 +34,7 @@ class Logic(object):
     db_default = {
         'interval': '20',
         'default_interface_id': '',
-        'default_traffic_view': '4',
+        'default_traffic_view': '3',
         'traffic_unit': '1',
         'traffic_list': '24,24,30,12,0,10'
     }
@@ -216,9 +216,6 @@ class Logic(object):
 
             ret.append(vnstat_interfaces)
         return ret
-
-    # TODO: 어제/오늘, 저번달, 이번달 비교?
-    # 설치, 노출 갯수 옵션
 
     @staticmethod
     def get_vnstat_info():
