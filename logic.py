@@ -107,15 +107,21 @@ class Logic(object):
     @staticmethod
     def install():
         try:
-            import platform
+            import platform, threading
             if platform.system() == 'Linux' and app.config['config']['running_type'] == 'docker':
                 install_sh = os.path.join(os.path.dirname(__file__), 'install.sh')
-                returncode = subprocess.check_call(['chmod', '+x', install_sh])
-                if returncode != 0:
-                    return {'succes': False, 'log': '설치 중 에러 - 권한 문제'}
-                returncode = subprocess.check_call([install_sh, '2.6'])
-                if returncode != 0:
-                    return {'success': False, 'log': '설치 중 에러 - exitcode: {}'.format(returncode)}                    
+                def func():
+                    import system
+                    commands = [
+                        ['msg', u'잠시만 기다려주세요.'],
+                        ['chmod', '+x', install_sh],
+                        [install_sh, '2.6'],
+                        ['msg', u'설치가 완료되었습니다.']
+                    ]
+                    system.SystemLogicCommand.start('설치', commands)
+                t = threading.Thread(target=func, args=())
+                t.setDaemon(True)
+                t.start()
                 # finally check vnStat imported
                 vernum = Logic.is_installed()
                 if vernum:

@@ -4,7 +4,7 @@
 apk del --purge --no-cache vnstat
 
 { 
-    apk add --no-cache vnstat~="${1}" && exit 0;
+    apk add --no-cache vnstat~="${1}" >/dev/null 2>&1 && exit 0;
 } || {
     apk add --no-cache --virtual=vnstat-build \
         sqlite-dev \
