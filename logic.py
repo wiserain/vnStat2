@@ -122,12 +122,7 @@ class Logic(object):
                 t = threading.Thread(target=func, args=())
                 t.setDaemon(True)
                 t.start()
-                # finally check vnStat imported
-                vernum = Logic.is_installed()
-                if vernum:
-                    return {'success': True, 'log': 'vnStat v{}'.format(vernum), 'version': vernum}
-                else:
-                    return {'success': False, 'log': '설치 후 알 수 없는 에러. 개발자에게 보고바람'}
+                return {'success': True}
             else:
                 return {'succes': False, 'log': '지원하지 않는 시스템입니다.'}
         except Exception as e:
@@ -232,16 +227,13 @@ class Logic(object):
                 vnstat_info = Logic.parsing_vnstat_json(vnstat_json)
                 return {'ret': 'success', 'data': vnstat_info}
             except Exception as e:
-                logger.info('Exception: %s', e)
-                logger.info(traceback.format_exc())
+                logger.error('Exception: %s', e)
                 return {'ret': 'parsing_error', 'log': str(e)}
         except subprocess.CalledProcessError as e:
             # vnStat 바이너리가 없을때
-            logger.info('Exception:%s', e)
-            logger.info(traceback.format_exc())
+            logger.error('Exception:%s', e.output.strip())
             return {'ret': 'no_bin', 'log': e.output.strip()}
         except Exception as e:
             # 그 외의 에러, 대부분 데이터베이스가 없어서 json 값이 들어오지 않는 경우
-            logger.info('Exception:%s', e)
-            logger.info(traceback.format_exc())
+            logger.error('Exception:%s', e)
             return {'ret': 'no_json', 'log': vnstat_stdout}
