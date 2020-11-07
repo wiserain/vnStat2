@@ -19,8 +19,8 @@ from framework.util import Util
 package_name = __name__.split('.')[0]
 logger = get_logger(package_name)
 
-from logic import Logic
-from model import ModelSetting
+from .logic import Logic
+from .model import ModelSetting
 
 blueprint = Blueprint(
     package_name, package_name,
@@ -39,7 +39,7 @@ def plugin_unload():
 
 plugin_info = {
     "category_name": "tool",
-    "version": "1.0.1",
+    "version": "1.1.0",
     "name": "vnStat2",
     "home": "https://github.com/wiserain/vnStat2",
     "more": "https://github.com/wiserain/vnStat2",
