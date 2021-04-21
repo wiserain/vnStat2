@@ -110,18 +110,14 @@ class Logic(object):
             import platform, threading
             if platform.system() == 'Linux' and app.config['config']['running_type'] == 'docker':
                 install_sh = os.path.join(os.path.dirname(__file__), 'install.sh')
-                def func():
-                    import system
-                    commands = [
-                        ['msg', u'잠시만 기다려주세요.'],
-                        ['chmod', '+x', install_sh],
-                        [install_sh, '2.6'],
-                        ['msg', u'설치가 완료되었습니다.']
-                    ]
-                    system.SystemLogicCommand.start('설치', commands)
-                t = threading.Thread(target=func, args=())
-                t.setDaemon(True)
-                t.start()
+                from system.logic_command2 import SystemLogicCommand2
+                commands = [
+                    ['msg', u'잠시만 기다려주세요.'],
+                    ['chmod', '+x', install_sh],
+                    [install_sh, '2.6'],
+                    ['msg', u'설치가 완료되었습니다.']
+                ]
+                SystemLogicCommand2('설치', commands, wait=False, show_modal=True, clear=True).start()
                 return {'success': True}
             else:
                 return {'succes': False, 'log': '지원하지 않는 시스템입니다.'}

@@ -1,5 +1,12 @@
 #!/bin/sh
 
+if [ -f /usr/bin/apt ]; then
+    apt-get update -yqq
+    apt-get install -yqq --no-install-recommends \
+        vnstat=${1}*
+    exit $?
+fi
+
 # delete existing vnstat
 apk del --purge --no-cache vnstat
 
