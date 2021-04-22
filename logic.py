@@ -6,6 +6,7 @@ import traceback
 from datetime import datetime
 import subprocess
 import json
+import platform
 
 # third-party
 
@@ -13,7 +14,7 @@ import json
 from framework import db, scheduler, app
 from framework.job import Job
 from framework.util import Util
-
+from system.logic_command2 import SystemLogicCommand2 as SystemCommand
 
 # 패키지
 from .plugin import package_name, logger
@@ -64,8 +65,8 @@ class Logic(object):
             # vnstat 자동설치
             is_installed = Logic.is_installed()
             if not is_installed or not any(x in is_installed for x in plugin_info['supported_vnstat_version']):
-                Logic.install()
-        except Exception as e: 
+                Logic.install(show_modal=False)
+        except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
 
@@ -105,19 +106,17 @@ class Logic(object):
             return False
 
     @staticmethod
-    def install():
+    def install(show_modal=True):
         try:
-            import platform, threading
             if platform.system() == 'Linux' and app.config['config']['running_type'] == 'docker':
-                install_sh = os.path.join(os.path.dirname(__file__), 'install.sh')
-                from system.logic_command2 import SystemLogicCommand2
+                install_sh = os.path.join(os.path.dirname(__file__), 'install.sh')                
                 commands = [
                     ['msg', u'잠시만 기다려주세요.'],
                     ['chmod', '+x', install_sh],
                     [install_sh, '2.6'],
-                    ['msg', u'설치가 완료되었습니다.']
+                    ['msg', u'완료되었습니다.']
                 ]
-                SystemLogicCommand2('설치', commands, wait=False, show_modal=True, clear=True).start()
+                SystemCommand('vnStat 설치', commands, wait=True, show_modal=show_modal, clear=True).start()
                 return {'success': True}
             else:
                 return {'succes': False, 'log': '지원하지 않는 시스템입니다.'}
@@ -228,7 +227,7 @@ class Logic(object):
         except subprocess.CalledProcessError as e:
             # vnStat 바이너리가 없을때
             logger.error('Exception:%s', e.output.strip())
-            return {'ret': 'no_bin', 'log': e.output.strip()}
+            return {'ret': 'no_bin', 'log': e.output.strip().decode('utf-8')}
         except Exception as e:
             # 그 외의 에러, 대부분 데이터베이스가 없어서 json 값이 들어오지 않는 경우
             logger.error('Exception:%s', e)
