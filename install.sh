@@ -43,17 +43,16 @@ fi
 if [ $distro = "ubuntu" ]; then
     # wait until apt-get not used by other process
     while ps -opid= -C apt-get > /dev/null; do sleep 1; done
-    # apt-get update if never done or older than an hour
+    # apt-get update if never done during the past 24 hours
     [ ! -d /var/lib/apt/lists/partial ] && apt-get update -yqq
-    [ "$(find /var/lib/apt/lists/partial/ -mtime +1 | grep partial | wc -l)" != "0" ] && \
-        apt-get update -yqq
+    [ -z "$(find -H /var/lib/apt/lists -maxdepth 0 -mtime -1)" ] && apt-get update -yqq 
 
     echo ""
     echo "===================================================================="
     echo "Installing vnStat ..."
     echo "===================================================================="
     echo ""
-    apt-get install -yqq --no-install-recommends \
+    apt-get install -y --no-install-recommends \
         vnstat=${1}*
 elif [ $distro = "alpine" ]; then
     # delete existing vnstat
