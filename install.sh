@@ -40,6 +40,11 @@ else
     exit 2
 fi
 
+vnstatver() {
+    command -v vnstat >/dev/null 2>&1 && \
+        vnstat -v 2>&1 | awk '{print $2}'
+}
+
 if [ $distro = "ubuntu" ]; then
     # wait until apt-get not used by other process
     while ps -opid= -C apt-get > /dev/null; do sleep 1; done
@@ -47,13 +52,52 @@ if [ $distro = "ubuntu" ]; then
     [ ! -d /var/lib/apt/lists/partial ] && apt-get update -yqq
     [ -z "$(find -H /var/lib/apt/lists -maxdepth 0 -mtime -1)" ] && apt-get update -yqq 
 
+    # delete exisiting vnstat
+    apt-get remove --purge -y vnstat
+
     echo ""
     echo "===================================================================="
     echo "Installing vnStat ..."
     echo "===================================================================="
     echo ""
     apt-get install -y --no-install-recommends \
-        vnstat=${1}*
+        vnstat
+        
+    if [ "$(vnstatver)" != "${1}" ]; then
+        echo ""
+        echo "===================================================================="
+        echo "Building vnStat from source ..."
+        echo "===================================================================="
+        echo ""
+        apt-get install -y --no-install-recommends \
+            gcc \
+            make \
+            libsqlite3-dev \
+            wget
+
+        tmpdir=$(mktemp -d)
+        cd "$tmpdir" || exit
+
+        wget http://humdi.net/vnstat/vnstat-"${1}".tar.gz --no-check-certificate -O - | tar -xzvf - --strip-components=1
+
+        ./configure \
+            --prefix=/usr \
+            --sysconfdir=/etc \
+            --mandir=/usr/share/man \
+            --infodir=/usr/share/info
+
+        make && make install
+
+        apt-get remove --purge --autoremove -y \
+            gcc \
+            make \
+            libsqlite3-dev
+        apt-get install -y --no-install-recommends \
+            'libsqlite3[-.0-9]+$' \
+            lsb-base
+
+        rm -rf "$tmpdir"
+    fi
 elif [ $distro = "alpine" ]; then
     # delete existing vnstat
     apk del --purge --no-cache vnstat
@@ -63,8 +107,8 @@ elif [ $distro = "alpine" ]; then
     echo "Installing vnStat from package repository ..."
     echo "===================================================================="
     echo ""
-    apk add --no-cache vnstat~="${1}" >/dev/null 2>&1
-    if [ $? != 0 ]; then
+    apk add --no-cache vnstat
+    if [ "$(vnstatver)" != "${1}" ]; then
         echo ""
         echo "===================================================================="
         echo "Building vnStat from source ..."
@@ -81,7 +125,7 @@ elif [ $distro = "alpine" ]; then
         tmpdir=$(mktemp -d)
         cd "$tmpdir" || exit
 
-        wget http://humdi.net/vnstat/vnstat-"${1}".tar.gz -O - | tar -xzvf - --strip-components=1
+        wget http://humdi.net/vnstat/vnstat-"${1}".tar.gz --no-check-certificate -O - | tar -xzvf - --strip-components=1
 
         # https://github.com/alpinelinux/aports/blob/master/community/vnstat/APKBUILD
         ./configure \

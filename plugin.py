@@ -39,7 +39,7 @@ def plugin_unload():
 
 plugin_info = {
     "category_name": "tool",
-    "version": "1.1.3",
+    "version": "1.1.4",
     "name": "vnStat2",
     "home": "https://github.com/wiserain/vnStat2",
     "more": "https://github.com/wiserain/vnStat2",
