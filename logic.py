@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-#########################################################
-# python
 import os
 import traceback
 from datetime import datetime
@@ -9,16 +7,20 @@ import json
 import platform
 
 # third-party
+from flask import render_template, jsonify
 
-# sjva 공용
-from framework import db, scheduler, app
-from framework.job import Job
-from framework.util import Util
+# app common
+from framework import app
+from framework.common.plugin import LogicModuleBase
 from system.logic_command2 import SystemLogicCommand2 as SystemCommand
 
-# 패키지
-from .plugin import package_name, logger
-from .model import ModelSetting
+# local
+from .plugin import plugin
+
+logger = plugin.logger
+package_name = plugin.package_name
+plugin_info = plugin.plugin_info
+ModelSetting = plugin.ModelSetting
 
 
 def strftime(dt, fmt):
@@ -30,8 +32,7 @@ def strftime(dt, fmt):
     return datetime(year, month, day, hour, minute).strftime(fmt)
 
 
-class Logic(object):
-    # 디폴트 세팅값
+class LogicMain(LogicModuleBase):
     db_default = {
         'interval': '20',
         'default_interface_id': '',
@@ -39,74 +40,72 @@ class Logic(object):
         'traffic_unit': '1',
         'traffic_list': '24,24,30,12,0,10'
     }
+    
+    def __init__(self, P):
+        super(LogicMain, self).__init__(P, None)
 
-    @staticmethod
-    def db_init():
+    def plugin_load(self):
         try:
-            for key, value in Logic.db_default.items():
-                if db.session.query(ModelSetting).filter_by(key=key).count() == 0:
-                    db.session.add(ModelSetting(key, value))
-            db.session.commit()
-        except Exception as e: 
-            logger.error('Exception:%s', e)
-            logger.error(traceback.format_exc())
-
-    @staticmethod
-    def plugin_load():
-        try:
-            logger.debug('%s plugin_load', package_name)
-            # DB 초기화
-            Logic.db_init()
-
-            # 편의를 위해 json 파일 생성
-            from .plugin import plugin_info
-            Util.save_from_dict_to_json(plugin_info, os.path.join(os.path.dirname(__file__), 'info.json'))
-
             # vnstat 자동설치
-            is_installed = Logic.is_installed()
+            is_installed = self.is_installed()
             if not is_installed or not any(x in is_installed for x in plugin_info['supported_vnstat_version']):
-                Logic.install(show_modal=False)
+                self.install(show_modal=False)
         except Exception as e:
             logger.error('Exception:%s', e)
             logger.error(traceback.format_exc())
 
-    @staticmethod
-    def plugin_unload():
-        try:
-            logger.debug('%s plugin_unload', package_name)
-        except Exception as e: 
-            logger.error('Exception:%s', e)
-            logger.error(traceback.format_exc())
+    def process_menu(self, sub, req):
+        arg = ModelSetting.to_dict()
+        if sub == 'setting':
+            return render_template(f'{package_name}_{sub}.html', sub=sub, arg=arg)
+        elif sub == 'traffic':
+            return render_template(f'{package_name}_{sub}.html', arg=arg)
+        return render_template('sample.html', title=f'{package_name} - {sub}')
 
-    @staticmethod
-    def setting_save(req):
-        try:
-            for key, value in req.form.items():
-                entity = db.session.query(ModelSetting).filter_by(key=key).with_for_update().first()
-                entity.value = value
-            db.session.commit()
-            return True                  
-        except Exception as e: 
-            logger.error('Exception:%s', e)
-            logger.error(traceback.format_exc())
-            return False
-    # 기본 구조 End
-    ##################################################################
+    def process_ajax(self, sub, req):
+        if sub == 'install':
+            try:
+                ret = self.install()
+                return jsonify(ret)
+            except Exception as e: 
+                logger.error('Exception:%s', e)
+                logger.error(traceback.format_exc())
+        elif sub == 'is_installed':
+            try:
+                is_installed = self.is_installed()
+                if is_installed:
+                    ret = {'installed': True, 'version': is_installed}
+                else:
+                    ret = {'installed': False}
+                return jsonify(ret)
+            except Exception as e:
+                logger.error('Exception:%s', e)
+                logger.error(traceback.format_exc())
+        elif sub == 'get_default_interface_id':
+            try:
+                return jsonify({'default_interface_id': ModelSetting.get('default_interface_id')})
+            except Exception as e: 
+                logger.error('Exception:%s', e)
+                logger.error(traceback.format_exc())
+        elif sub == 'get_vnstat_info':
+            try:
+                ret = self.get_vnstat_info()
+                return jsonify(ret)
+            except Exception as e:
+                logger.error('Exception:%s', e)
+                logger.error(traceback.format_exc())
 
-    @staticmethod
-    def is_installed():
+    def is_installed(self):
         try:
             verstr = subprocess.check_output("vnstat -v", shell=True, stderr=subprocess.STDOUT).decode('utf-8').strip()
             vernum = verstr.split()[1]
-            from .plugin import plugin_info
             if not any(vernum in x for x in plugin_info['supported_vnstat_version']):
                 vernum += ' - 지원하지 않는 버전'
             return vernum
         except Exception:
             return False
 
-    @staticmethod
-    def install(show_modal=True):
+    def install(self, show_modal=True):
         try:
             if platform.system() == 'Linux' and app.config['config']['running_type'] == 'docker':
                 install_sh = os.path.join(os.path.dirname(__file__), 'install.sh')                
@@ -125,8 +124,7 @@ class Logic(object):
             logger.error(traceback.format_exc())
             return {'success': False, 'log': str(e)}
 
-    @staticmethod
-    def parsing_vnstat_traffic(traffic, data_type):
+    def parsing_vnstat_traffic(self, traffic, data_type):
         labels, rxs, txs, totals = [], [], [], []
         for item in traffic[data_type]:
             # fiveminute, hour, day, month, year, top
@@ -160,9 +158,8 @@ class Logic(object):
             'txs': txs,
             'totals': totals,
         }
-    
-    @staticmethod
-    def parsing_vnstat_json(vnstat_json):
+
+    def parsing_vnstat_json(self, vnstat_json):
         ret = []
         for interface in vnstat_json['interfaces']:
             traffic = interface['traffic']
@@ -170,12 +167,12 @@ class Logic(object):
                 'name': interface['name'],
                 'created': strftime(interface['created'], '%Y-%m-%d'),
                 'updated': strftime(interface['updated'], '%Y-%m-%d %H:%M'),
-                'fiveminute': Logic.parsing_vnstat_traffic(traffic, 'fiveminute'),
-                'hour': Logic.parsing_vnstat_traffic(traffic, 'hour'),
-                'day': Logic.parsing_vnstat_traffic(traffic, 'day'),
-                'month': Logic.parsing_vnstat_traffic(traffic, 'month'),
-                'year': Logic.parsing_vnstat_traffic(traffic, 'year'),
-                'top': Logic.parsing_vnstat_traffic(traffic, 'top'),
+                'fiveminute': self.parsing_vnstat_traffic(traffic, 'fiveminute'),
+                'hour': self.parsing_vnstat_traffic(traffic, 'hour'),
+                'day': self.parsing_vnstat_traffic(traffic, 'day'),
+                'month': self.parsing_vnstat_traffic(traffic, 'month'),
+                'year': self.parsing_vnstat_traffic(traffic, 'year'),
+                'top': self.parsing_vnstat_traffic(traffic, 'top'),
             }
             # summary
             labels, rxs, txs, totals = [], [], [], []
@@ -213,13 +210,12 @@ class Logic(object):
             ret.append(vnstat_interfaces)
         return ret
 
-    @staticmethod
-    def get_vnstat_info():
+    def get_vnstat_info(self):
         try:
             vnstat_stdout = subprocess.check_output("vnstat --json", shell=True, stderr=subprocess.STDOUT).decode('utf-8').strip()
             vnstat_json = json.loads(vnstat_stdout)
             try:
-                vnstat_info = Logic.parsing_vnstat_json(vnstat_json)
+                vnstat_info = self.parsing_vnstat_json(vnstat_json)
                 return {'ret': 'success', 'data': vnstat_info}
             except Exception as e:
                 logger.error('Exception: %s', e)
