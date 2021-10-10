@@ -24,7 +24,7 @@ class PlugIn(object):
 
     plugin_info = {
         "category_name": "tool",
-        "version": "1.2.1",
+        "version": "1.2.2",
         "name": "vnStat2",
         "home": "https://github.com/wiserain/vnStat2",
         "more": "https://github.com/wiserain/vnStat2",

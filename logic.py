@@ -178,14 +178,24 @@ class LogicMain(LogicModuleBase):
             labels, rxs, txs, totals = [], [], [], []
             
             labels.append('오늘')
-            rxs.append(vnstat_interfaces['day']['rxs'][-1])
-            txs.append(vnstat_interfaces['day']['txs'][-1])
-            totals.append(vnstat_interfaces['day']['totals'][-1])
+            try:
+                rxs.append(vnstat_interfaces['day']['rxs'][-1])
+                txs.append(vnstat_interfaces['day']['txs'][-1])
+                totals.append(vnstat_interfaces['day']['totals'][-1])
+            except IndexError:
+                rxs.append(0)
+                txs.append(0)
+                totals.append(0)
             
             labels.append('이번달')
-            rxs.append(vnstat_interfaces['month']['rxs'][-1])
-            txs.append(vnstat_interfaces['month']['txs'][-1])
-            totals.append(vnstat_interfaces['month']['totals'][-1])
+            try:
+                rxs.append(vnstat_interfaces['month']['rxs'][-1])
+                txs.append(vnstat_interfaces['month']['txs'][-1])
+                totals.append(vnstat_interfaces['month']['totals'][-1])
+            except IndexError:
+                rxs.append(0)
+                txs.append(0)
+                totals.append(0)
             
             labels.append('전체기간')
             rxs.append(traffic['total']['rx'])
@@ -218,13 +228,13 @@ class LogicMain(LogicModuleBase):
                 vnstat_info = self.parsing_vnstat_json(vnstat_json)
                 return {'ret': 'success', 'data': vnstat_info}
             except Exception as e:
-                logger.error('Exception: %s', e)
+                logger.exception('Exception: %s', e)
                 return {'ret': 'parsing_error', 'log': str(e)}
         except subprocess.CalledProcessError as e:
             # vnStat 바이너리가 없을때
-            logger.error('Exception:%s', e.output.strip())
+            logger.exception('Exception:%s', e.output.strip())
             return {'ret': 'no_bin', 'log': e.output.strip().decode('utf-8')}
         except Exception as e:
             # 그 외의 에러, 대부분 데이터베이스가 없어서 json 값이 들어오지 않는 경우
-            logger.error('Exception:%s', e)
+            logger.exception('Exception:%s', e)
             return {'ret': 'no_json', 'log': vnstat_stdout}
