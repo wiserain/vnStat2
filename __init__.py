@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from .plugin import plugin as p
 
 blueprint = p.blueprint
