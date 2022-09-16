@@ -23,12 +23,17 @@ ModelSetting = plugin.ModelSetting
 
 
 def strftime(dt, fmt):
-    year = dt["date"]["year"] if ("date" in dt and "year" in dt["date"]) else 1971
-    month = dt["date"]["month"] if ("date" in dt and "month" in dt["date"]) else 1
-    day = dt["date"]["day"] if ("date" in dt and "day" in dt["date"]) else 1
-    hour = dt["time"]["hour"] if ("time" in dt and "hour" in dt["time"]) else 0
-    minute = dt["time"]["minute"] if ("time" in dt and "minute" in dt["time"]) else 0
+    year = dt.get("date", {}).get("year", 1971)
+    month = dt.get("date", {}).get("month", 1)
+    day = dt.get("date", {}).get("day", 1)
+    hour = dt.get("time", {}).get("hour", 0)
+    minute = dt.get("time", {}).get("minute", 0)
     return datetime(year, month, day, hour, minute).strftime(fmt)
+
+
+def check_output(command, shell=True):
+    stdout = subprocess.check_output(command, shell=shell, stderr=subprocess.STDOUT)
+    return os.linesep.join(stdout.decode(errors="ignore").splitlines())
 
 
 class LogicMain(LogicModuleBase):
@@ -49,9 +54,8 @@ class LogicMain(LogicModuleBase):
             is_installed = self.is_installed()
             if not is_installed or not any(x in is_installed for x in plugin_info["supported_vnstat_version"]):
                 self.install(show_modal=False)
-        except Exception as e:
-            logger.error("Exception:%s", e)
-            logger.error(traceback.format_exc())
+        except Exception:
+            logger.exception("Exception while attempting to install vnStat on plugin load:")
 
     def process_menu(self, sub, req):
         arg = ModelSetting.to_dict()
@@ -62,41 +66,27 @@ class LogicMain(LogicModuleBase):
         return render_template("sample.html", title=f"{package_name} - {sub}")
 
     def process_ajax(self, sub, req):
-        if sub == "install":
-            try:
-                ret = self.install()
-                return jsonify(ret)
-            except Exception as e:
-                logger.error("Exception:%s", e)
-                logger.error(traceback.format_exc())
-        elif sub == "is_installed":
-            try:
+        try:
+            if sub == "install":
+                return jsonify(self.install())
+            if sub == "is_installed":
                 is_installed = self.is_installed()
                 if is_installed:
                     ret = {"installed": True, "version": is_installed}
                 else:
                     ret = {"installed": False}
                 return jsonify(ret)
-            except Exception as e:
-                logger.error("Exception:%s", e)
-                logger.error(traceback.format_exc())
-        elif sub == "get_default_interface_id":
-            try:
+            if sub == "get_default_interface_id":
                 return jsonify({"default_interface_id": ModelSetting.get("default_interface_id")})
-            except Exception as e:
-                logger.error("Exception:%s", e)
-                logger.error(traceback.format_exc())
-        elif sub == "get_vnstat_info":
-            try:
-                ret = self.get_vnstat_info()
-                return jsonify(ret)
-            except Exception as e:
-                logger.error("Exception:%s", e)
-                logger.error(traceback.format_exc())
+            if sub == "get_vnstat_info":
+                return jsonify(self.get_vnstat_info())
+            raise NotImplementedError(f"Unknown sub for ajax request: {sub}")
+        except Exception:
+            logger.exception("Exception while processing ajax request:")
 
     def is_installed(self):
         try:
-            verstr = subprocess.check_output("vnstat -v", shell=True, stderr=subprocess.STDOUT).decode("utf-8").strip()
+            verstr = check_output("vnstat -v")
             vernum = verstr.split()[1]
             if not any(vernum in x for x in plugin_info["supported_vnstat_version"]):
                 vernum += " - 지원하지 않는 버전"
@@ -224,21 +214,19 @@ class LogicMain(LogicModuleBase):
 
     def get_vnstat_info(self):
         try:
-            vnstat_stdout = (
-                subprocess.check_output("vnstat --json", shell=True, stderr=subprocess.STDOUT).decode("utf-8").strip()
-            )
+            vnstat_stdout = check_output("vnstat --json")
             vnstat_json = json.loads(vnstat_stdout)
             try:
                 vnstat_info = self.parsing_vnstat_json(vnstat_json)
                 return {"ret": "success", "data": vnstat_info}
             except Exception as e:
-                logger.exception("Exception: %s", e)
+                logger.exception("Exception while parsing json outputs from vnStat:")
                 return {"ret": "parsing_error", "log": str(e)}
         except subprocess.CalledProcessError as e:
             # vnStat 바이너리가 없을때
-            logger.exception("Exception:%s", e.output.strip())
+            logger.error(e)
             return {"ret": "no_bin", "log": e.output.strip().decode("utf-8")}
-        except Exception as e:
+        except Exception:
             # 그 외의 에러, 대부분 데이터베이스가 없어서 json 값이 들어오지 않는 경우
-            logger.exception("Exception:%s", e)
+            logger.exception("Exception while getting result of vnStat:")
             return {"ret": "no_json", "log": vnstat_stdout}
